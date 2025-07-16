@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>E-Voting Verifier</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #e0eafc, #cfdef3);
+      margin: 0;
+      padding: 30px;
+      color: #333;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+      animation: slideDown 0.6s ease;
+    }
+
+    @keyframes slideDown {
+      from { transform: translateY(-30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    label, input, button {
+      font-size: 1rem;
+    }
+
+    input, button {
+      padding: 10px;
+      margin: 8px 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #007BFF;
+      box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+      transform: scale(1.05);
+    }
+
+    #status {
+      margin: 20px 0;
+      font-size: 1.2rem;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .verified {
+      background-color: #d4edda;
+      color: #155724;
+      box-shadow: 0 0 10px #28a745;
+    }
+
+    .tampered {
+      background-color: #f8d7da;
+      color: #721c24;
+      box-shadow: 0 0 10px #dc3545;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background-color: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+
+    th {
+      background-color: #3498db;
+      color: white;
+    }
+
+    tr.fade-in {
+      animation: fadeInRow 0.6s ease;
+    }
+
+    @keyframes fadeInRow {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 15px;
+      }
+      table, thead, tbody, th, td, tr {
+        font-size: 0.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>E-Voting Verifier using Hash Chain</h2>
+  <label for="voterID">Voter ID:</label>
+  <input type="text" id="voterID" />
+  <label for="vote">Vote (Party Name):</label>
+  <input type="text" id="vote" />
+  <button onclick="castVote()">Cast Vote</button>
+  <button onclick="tamperVote()">Tamper 2nd Vote</button>
+  <button onclick="verifyVotes()">Verify Votes</button>
+
+  <div id="status"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Voter ID</th>
+        <th>Vote</th>
+        <th>Hash</th>
+      </tr>
+    </thead>
+    <tbody id="voteTable"></tbody>
+  </table>
+
+  <script>
+    let votes = [];
+    let prevHash = "0";
+
+    function simpleHash(data) {
+      let hash = 0;
+      for (let i = 0; i < data.length; i++) {
+        hash = (hash * 31 + data.charCodeAt(i)) % 100000;
+      }
+      return hash.toString();
+    }
+
+    function castVote() {
+      const voterID = document.getElementById("voterID").value.trim();
+      const vote = document.getElementById("vote").value.trim();
+      if (!voterID || !/^[a-zA-Z]+$/.test(vote)) {
+        alert("Please enter valid Voter ID and alphabetic Vote (Party name only).");
+        return;
+      }
+
+      const data = voterID + vote + prevHash;
+      const hash = simpleHash(data);
+      votes.push({ voterID, vote, hash });
+      prevHash = hash;
+      updateTable(true);
+      document.getElementById("voterID").value = "";
+      document.getElementById("vote").value = "";
+    }
+
+    function updateTable(withAnimation = false) {
+      const tbody = document.getElementById("voteTable");
+      tbody.innerHTML = "";
+      votes.forEach((v, index) => {
+        const row = document.createElement("tr");
+        if (withAnimation && index === votes.length - 1) {
+          row.classList.add("fade-in");
+        }
+        row.innerHTML = `<td>${index + 1}</td><td>${v.voterID}</td><td>${v.vote}</td><td>${v.hash}</td>`;
+        tbody.appendChild(row);
+      });
+    }
+
+    function tamperVote() {
+      if (votes.length >= 2) {
+        votes[1].vote = "HackedVote";
+        updateTable();
+        alert("Vote tampered: 2nd voter's vote changed to 'HackedVote'");
+      } else {
+        alert("Need at least 2 votes to tamper.");
+      }
+    }
+
+    function verifyVotes() {
+      let valid = true;
+      let hash = "0";
+      for (let i = 0; i < votes.length; i++) {
+        const expected = simpleHash(votes[i].voterID + votes[i].vote + hash);
+        if (expected !== votes[i].hash) {
+          valid = false;
+          break;
+        }
+        hash = votes[i].hash;
+      }
+
+      const statusDiv = document.getElementById("status");
+      if (valid) {
+        statusDiv.innerHTML = "✅ All votes are verified. No tampering detected.";
+        statusDiv.className = "verified";
+      } else {
+        statusDiv.innerHTML = "⚠️ Verification failed. Tampering detected!";
+        statusDiv.className = "tampered";
+      }
+    }
+  </script>
+</body>
+</html>
